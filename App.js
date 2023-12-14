@@ -1,111 +1,112 @@
-/**
- * Sample React Native App
- * https://github.com/facebook/react-native
- *
- * @format
- * @flow strict-local
- */
+import React, { useState, useEffect } from 'react';
+import { View, Text, Button, FlatList, PermissionsAndroid, TextInput, StyleSheet } from 'react-native';
+import WifiManager from 'react-native-wifi-reborn';
 
-import React from 'react';
-import {
-  SafeAreaView,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  useColorScheme,
-  View,
-} from 'react-native';
+export default function App() {
+  const [wifiList, setWifiList] = useState([]);
+  const [connectedSSID, setConnectedSSID] = useState('');
+  const [passwords, setPasswords] = useState({}); // Her SSID için şifreleri saklamak üzere
 
-import {
-  Colors,
-  DebugInstructions,
-  Header,
-  LearnMoreLinks,
-  ReloadInstructions,
-} from 'react-native/Libraries/NewAppScreen';
+  const requestLocationPermission = async () => {
+    try {
+      const granted = await PermissionsAndroid.requestMultiple([
+        PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+        PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION,
+      ]);
 
-const Section = ({children, title}) => {
-  const isDarkMode = useColorScheme() === 'dark';
-  return (
-    <View style={styles.sectionContainer}>
-      <Text
-        style={[
-          styles.sectionTitle,
-          {
-            color: isDarkMode ? Colors.white : Colors.black,
-          },
-        ]}>
-        {title}
-      </Text>
-      <Text
-        style={[
-          styles.sectionDescription,
-          {
-            color: isDarkMode ? Colors.light : Colors.dark,
-          },
-        ]}>
-        {children}
-      </Text>
-    </View>
-  );
-};
-
-const App = () => {
-  const isDarkMode = useColorScheme() === 'dark';
-
-  const backgroundStyle = {
-    backgroundColor: isDarkMode ? Colors.darker : Colors.lighter,
+      if (
+        granted['android.permission.ACCESS_FINE_LOCATION'] === PermissionsAndroid.RESULTS.GRANTED &&
+        granted['android.permission.ACCESS_COARSE_LOCATION'] === PermissionsAndroid.RESULTS.GRANTED
+      ) {
+        console.log('Location permission granted');
+        scanWifi();
+      } else {
+        console.log('Location permission denied');
+      }
+    } catch (err) {
+      console.warn(err);
+    }
   };
 
-  return (
-    <SafeAreaView style={backgroundStyle}>
-      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
-      <ScrollView
-        contentInsetAdjustmentBehavior="automatic"
-        style={backgroundStyle}>
-        <Header />
-        <View
-          style={{
-            backgroundColor: isDarkMode ? Colors.black : Colors.white,
-          }}>
-          <Section title="Step One">
-            Edit <Text style={styles.highlight}>App.js</Text> to change this
-            screen and then come back to see your edits.
-          </Section>
-          <Section title="See Your Changes">
-            <ReloadInstructions />
-          </Section>
-          <Section title="Debug">
-            <DebugInstructions />
-          </Section>
-          <Section title="Learn More">
-            Read the docs to discover what to do next:
-          </Section>
-          <LearnMoreLinks />
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+  const scanWifi = async () => {
+    try {
+      const wifiArray = await WifiManager.reScanAndLoadWifiList();
+      setWifiList(wifiArray);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const connectToWifi = async (ssid) => {
+    try {
+      const password = passwords[ssid] || '';
+      const response = await WifiManager.connectToProtectedSSID(ssid, password, false, false, false);
+      console.log('Connected to WiFi:', ssid);
+      setConnectedSSID(ssid);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const updatePassword = (ssid, password) => {
+    setPasswords(prevPasswords => ({ ...prevPasswords, [ssid]: password }));
+  };
+
+  const renderItem = ({ item }) => (
+    <View style={styles.itemContainer}>
+      <Text>SSID: {item.SSID}</Text>
+      <TextInput 
+        style={styles.textInput}
+        onChangeText={(text) => updatePassword(item.SSID, text)}
+        value={passwords[item.SSID] || ''}
+        placeholder="Enter WiFi Password"
+        secureTextEntry
+      />
+      <Button
+        title="Connect"
+        onPress={() => connectToWifi(item.SSID)}
+      />
+    </View>
   );
-};
+
+  useEffect(() => {
+    requestLocationPermission();
+  }, []);
+
+  return (
+    <View style={styles.container}>
+      <FlatList
+        data={wifiList}
+        renderItem={renderItem}
+        keyExtractor={(item) => item.BSSID}
+        ListHeaderComponent={() => (
+          <Button title="Scan WiFi" onPress={scanWifi} />
+        )}
+      />
+
+      {connectedSSID !== '' && (
+        <View style={{ marginTop: 20 }}>
+          <Text>Connected to WiFi: {connectedSSID}</Text>
+        </View>
+      )}
+    </View>
+  );
+}
 
 const styles = StyleSheet.create({
-  sectionContainer: {
-    marginTop: 32,
-    paddingHorizontal: 24,
+  container: {
+    padding: 20,
   },
-  sectionTitle: {
-    fontSize: 24,
-    fontWeight: '600',
+  itemContainer: {
+    padding: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#cccccc',
   },
-  sectionDescription: {
-    marginTop: 8,
-    fontSize: 18,
-    fontWeight: '400',
-  },
-  highlight: {
-    fontWeight: '700',
+  textInput: {
+    height: 40,
+    borderColor: 'gray',
+    borderWidth: 1,
+    marginTop: 5,
+    marginBottom: 5,
   },
 });
-
-export default App;

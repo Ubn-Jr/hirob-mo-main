@@ -55,10 +55,10 @@ const BluetoothDemo = () => {
         return;
       }
 
-      if (!device.name === null) {
+      if (device) {
         console.log(`Device found: ${device.name}`);
       }
-      if (device.name === 'MyESP32') {
+      if (device.name === 'MyESP322') {
 
 
         device
